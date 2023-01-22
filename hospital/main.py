@@ -1,5 +1,9 @@
-from fastapi import FastAPI
+import os
+from fastapi import FastAPI, Request, Response
 from routers import hospital_router, department_router
+from fastapi_cache import FastAPICache
+from fastapi_cache.backends.redis import RedisBackend
+from redis import asyncio as aioredis
 from db import database, metadata
 # import sqlalchemy
 app = FastAPI()
@@ -18,6 +22,10 @@ app.include_router(router=department_router.department_router,
                    prefix='/department',
                    tags=['Department'])
 
+REDIS_URL = "redis://127.0.0.1:6379"
+
+# TODO: write logs
+
 
 @app.on_event("startup")
 async def startup() -> None:
@@ -26,6 +34,9 @@ async def startup() -> None:
     if not database_.is_connected:
         await database_.connect()
     print('Connected!')
+    redis = aioredis.from_url(
+        REDIS_URL, encoding="utf8", decode_responses=True)
+    FastAPICache.init(RedisBackend(redis), prefix="hospital-cache")
 
 
 @app.on_event("shutdown")

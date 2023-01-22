@@ -3,16 +3,20 @@ from ormar import exceptions
 from models.department import Department, Hospital
 from schemas.department_schemas import DepartmentCreateSchema, DepartmentReadSchema
 from typing import List
+from fastapi_cache import FastAPICache
+from fastapi_cache.decorator import cache
 department_router = APIRouter()
 
 
 @department_router.get('/', response_model=List[DepartmentReadSchema], status_code=status.HTTP_200_OK)
+@cache(expire=300, namespace='department')
 async def get_departments():
     departments = await Department.objects.select_related('hospital').all()
     return departments
 
 
 @department_router.get('/{department_id}', response_model=DepartmentReadSchema, status_code=status.HTTP_200_OK)
+@cache(expire=300, namespace='department')
 async def get_department_by_id(department_id: int):
     try:
         department = await Department.objects.select_related('hospital').get(pk=department_id)
@@ -34,6 +38,7 @@ async def create_department(department_to_create: DepartmentCreateSchema):
     except exceptions.ModelError:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="Check if the input is correct!")
+    await FastAPICache.clear(namespace="department")
     return department
 
 
@@ -51,10 +56,13 @@ async def create_department(department_id: int, department_to_update: Department
     except exceptions.ModelError:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="Check if the input is correct!")
+    await FastAPICache.clear(namespace="department")
     return updated_department
 
 
 @department_router.delete('/{department_id}', status_code=status.HTTP_204_NO_CONTENT)
 async def delete_department(department_id: int):
     department_to_delete = await get_department_by_id(department_id)
-    return await department_to_delete.delete()
+    await department_to_delete.delete()
+    await FastAPICache.clear(namespace="department")
+    return
